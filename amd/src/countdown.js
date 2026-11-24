@@ -18,17 +18,19 @@
  *
  * Ticks every second from the class times in the page (data-classes), so it needs no requests:
  * "Starting soon" from 15 minutes before, "Live now" with the time left during the class, and the
- * following class once it ends. Classes moved into the card are dropped from Coming up.
+ * following class once it ends. Classes that are over, or moved into the card, are dropped from
+ * Coming up, also when the next class card is switched off.
  *
  * @module     block_smooth_dashboard/countdown
  * @copyright  2026 Pedago Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {getString} from 'core/str';
-
 /** @var {number} A class this close to its start is "starting soon", in seconds. */
 const SOON = 15 * 60;
+
+/** @var {number} A device clock further than this from the server's is corrected, in seconds. */
+const SKEW = 60;
 
 /**
  * Two digits.
@@ -41,40 +43,82 @@ const pad = (value) => String(value).padStart(2, '0');
 /**
  * Start the countdown of one dashboard.
  *
+ * The page carries everything needed (class times, the server's time and the duration formats),
+ * so this makes no requests and cannot fail to start for want of one.
+ *
  * @param {string} rootId The dashboard's element id.
  */
-export const init = async(rootId) => {
+export const init = (rootId) => {
     const root = document.getElementById(rootId);
-    const hero = root ? root.querySelector('[data-region="nextclass"]') : null;
-    if (!hero) {
+    if (!root) {
+        return;
+    }
+    const hero = root.querySelector('[data-region="nextclass"]');
+    const list = root.querySelector('[data-region="classes"]');
+    if (!hero && !list) {
         return;
     }
     let classes = [];
     try {
-        classes = JSON.parse(hero.dataset.classes || '[]');
+        classes = JSON.parse(root.dataset.classes || '[]');
     } catch (e) {
         classes = [];
     }
 
-    const [hours, minutes] = await Promise.all([
-        getString('durationhours', 'block_smooth_dashboard', {hours: '{h}', minutes: '{m}'}),
-        getString('durationminutes', 'block_smooth_dashboard', '{m}'),
-    ]);
+    // A phone whose clock is wrong would count down to the wrong moment: go by the server's clock
+    // when the two are clearly apart. Small gaps are left alone, as they are mostly page load time.
+    const servernow = Number(root.dataset.now) || 0;
+    let offset = servernow ? servernow - Date.now() / 1000 : 0;
+    if (Math.abs(offset) < SKEW) {
+        offset = 0;
+    }
+    const clock = () => Math.floor(Date.now() / 1000 + offset);
+
+    const hoursformat = root.dataset.hoursformat || '{h} h {m} min';
+    const minutesformat = root.dataset.minutesformat || '{m} min';
     const duration = (secs) => {
-        const h = Math.floor(secs / 3600);
-        const m = Math.ceil((secs % 3600) / 60);
-        if (h || m === 60) {
-            return hours.replace('{h}', m === 60 ? h + 1 : h).replace('{m}', pad(m === 60 ? 0 : m));
+        let h = Math.floor(secs / 3600);
+        let m = Math.ceil((secs % 3600) / 60);
+        if (m === 60) {
+            h++;
+            m = 0;
         }
-        return minutes.replace('{m}', m);
+        return h ? hoursformat.replace('{h}', h).replace('{m}', pad(m)) : minutesformat.replace('{m}', m);
     };
 
     const field = (name) => hero.querySelector(`[data-field="${name}"]`);
-    let shown = classes.length ? classes[0].index : null;
+    let shown = hero && classes.length ? classes[0].index : null;
+
+    /**
+     * Drop classes from Coming up once they are over, or once they move into the next class card.
+     *
+     * @param {number} now
+     * @param {Object|undefined} current The class in the card.
+     */
+    const prune = (now, current) => {
+        if (!list) {
+            return;
+        }
+        const ends = new Map(classes.map((item) => [item.index, item.end]));
+        let left = 0;
+        list.querySelectorAll('[data-index]').forEach((item) => {
+            const index = Number(item.dataset.index);
+            item.hidden = (ends.get(index) || 0) <= now || (hero !== null && (!current || index <= current.index));
+            left += item.hidden ? 0 : 1;
+        });
+        const empty = root.querySelector('[data-region="classes-empty"]');
+        if (empty) {
+            empty.classList.toggle('d-none', left > 0);
+        }
+    };
 
     const tick = () => {
-        const now = Math.floor(Date.now() / 1000);
+        const now = clock();
         const current = classes.find((item) => item.end > now);
+        prune(now, current);
+        if (!hero) {
+            return Boolean(current);
+        }
 
         if (!current) {
             // What is shown in each state is up to the styles (is-empty, is-live, is-soon).
@@ -84,37 +128,21 @@ export const init = async(rootId) => {
         }
 
         if (current.index !== shown) {
-            // The class ended: show the following one and drop it from Coming up.
+            // The class ended: show the following one.
             shown = current.index;
             field('name').textContent = current.name;
             field('course').textContent = current.course;
             field('day').textContent = current.day;
             field('range').textContent = current.range;
+            field('startsat').textContent = current.startsat;
             hero.querySelector('[data-link="url"]').href = current.url;
             hero.querySelector('[data-link="joinurl"]').href = current.joinurl;
-            const startsat = field('startsat');
-            if (startsat) {
-                startsat.textContent = current.startsat;
-            }
-        }
-        const list = root.querySelector('[data-region="classes"]');
-        if (list) {
-            let left = 0;
-            list.querySelectorAll('[data-index]').forEach((item) => {
-                item.hidden = Number(item.dataset.index) <= shown;
-                left += item.hidden ? 0 : 1;
-            });
-            const empty = root.querySelector('[data-region="classes-empty"]');
-            if (empty) {
-                empty.classList.toggle('d-none', left > 0);
-            }
         }
 
         const live = current.start <= now;
         const left = Math.max(0, current.start - now);
-        const soon = !live && left <= SOON;
         hero.classList.toggle('is-live', live);
-        hero.classList.toggle('is-soon', soon);
+        hero.classList.toggle('is-soon', !live && left <= SOON);
         hero.classList.remove('is-empty');
 
         if (live) {
@@ -134,7 +162,7 @@ export const init = async(rootId) => {
         return;
     }
     const timer = setInterval(() => {
-        if (!document.body.contains(hero) || !tick()) {
+        if (!document.body.contains(root) || !tick()) {
             clearInterval(timer);
         }
     }, 1000);

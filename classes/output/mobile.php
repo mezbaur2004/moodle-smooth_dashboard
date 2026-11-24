@@ -30,7 +30,9 @@ use block_smooth_dashboard\local\content;
  * The dashboard on the Moodle app's Dashboard, with the same sections as on the website.
  *
  * The data goes to the app as plain text in otherdata; the app's template escapes it. A small
- * script keeps the countdown ticking, and stops when the block leaves the screen.
+ * script keeps the countdown ticking, and stops when the block leaves the screen. The script uses
+ * the device's clock: the app keeps block content for a while, so the server's time when the
+ * content was made would not be the time now.
  */
 class mobile {
     /**
@@ -41,7 +43,7 @@ class mobile {
      */
     public static function mobile_block_view(array $args): array {
         global $PAGE;
-        $otherdata = ['show' => json_encode(false)];
+        $otherdata = ['show' => self::flag(false)];
         if (isloggedin() && !isguestuser()) {
             $PAGE->set_context(\context_system::instance());
             $data = content::build();
@@ -75,7 +77,9 @@ class mobile {
                 'url' => $item['url'],
                 'status' => $item['status'],
                 'statustext' => $item['statustext'],
-                'color' => ['overdue' => 'danger', 'today' => 'warning', 'tomorrow' => 'primary'][$item['status']] ?? 'medium',
+                'color' => [
+                    'overdue' => 'danger', 'today' => 'warning', 'tomorrow' => 'primary', 'open' => 'success',
+                ][$item['status']] ?? 'medium',
                 'when' => $item['when'],
             ];
         }
@@ -129,19 +133,30 @@ class mobile {
         $strings['minutes'] = get_string('durationminutes', 'block_smooth_dashboard', '{m}');
 
         return [
-            'show' => json_encode(true),
-            'uniqid' => $context['uniqid'],
-            'greeting' => json_encode($context['greeting']),
-            'shownextclass' => json_encode((bool) $context['shownextclass']),
-            'showclasses' => json_encode((bool) $context['showclasses']),
+            'show' => self::flag(true),
+            // An object, or empty (false in the template) when the greeting is off.
+            'greeting' => $context['greeting'] ? json_encode($context['greeting']) : '',
+            'shownextclass' => self::flag($context['shownextclass']),
+            'showclasses' => self::flag($context['showclasses']),
             'classes' => json_encode($classes),
-            'showdeadlines' => json_encode((bool) $context['showdeadlines']),
+            'showdeadlines' => self::flag($context['showdeadlines']),
             'deadlines' => json_encode($deadlines),
-            'showcourses' => json_encode((bool) $context['showcourses']),
+            'showcourses' => self::flag($context['showcourses']),
             'courses' => json_encode($courses),
             'rankings' => json_encode($rankings),
             'strings' => json_encode($strings),
         ];
+    }
+
+    /**
+     * A flag for otherdata. The app only decodes values that start with { or [, so "false" would
+     * reach the template as a non-empty, true, string: flags are "1" or "".
+     *
+     * @param bool $value
+     * @return string
+     */
+    public static function flag(bool $value): string {
+        return $value ? '1' : '';
     }
 
     /**
@@ -151,7 +166,7 @@ class mobile {
      */
     protected static function template(): string {
         return <<<'HTML'
-<div *ngIf="CONTENT_OTHERDATA.show" [id]="CONTENT_OTHERDATA.uniqid">
+<div *ngIf="CONTENT_OTHERDATA.show">
     <ion-item lines="none" *ngIf="CONTENT_OTHERDATA.greeting">
         <ion-label>
             <h2><strong>{{ CONTENT_OTHERDATA.greeting.text }}</strong></h2>
@@ -265,7 +280,8 @@ HTML;
     }
 
     /**
-     * The countdown: the component's time moves on every second while the block is on screen.
+     * The countdown: the component's time moves on every second while the block is on screen, and
+     * stops when it leaves (the app calls a plugin's own ngOnDestroy).
      *
      * @return string
      */
@@ -317,18 +333,13 @@ self.sdEndsIn = function(item) {
     var strings = self.CONTENT_OTHERDATA.strings;
     return hours ? strings.hours.replace('{h}', hours).replace('{m}', pad(minutes)) : strings.minutes.replace('{m}', minutes);
 };
-var seen = false;
+// The app calls ngOnDestroy set here when the block leaves the screen.
 var timer = setInterval(function() {
-    var id = self.CONTENT_OTHERDATA && self.CONTENT_OTHERDATA.uniqid;
-    var element = id ? document.getElementById(id) : null;
-    if (element) {
-        seen = true;
-    } else if (seen) {
-        clearInterval(timer);
-        return;
-    }
     self.sdNow = Math.floor(Date.now() / 1000);
 }, 1000);
+self.ngOnDestroy = function() {
+    clearInterval(timer);
+};
 JS;
     }
 }

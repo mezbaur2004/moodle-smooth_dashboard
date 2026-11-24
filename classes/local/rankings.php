@@ -41,7 +41,8 @@ class rankings {
     }
 
     /**
-     * Per course with a leaderboard the user can see and a ranking to show.
+     * Per course with a leaderboard the user can see and a ranking to show. Leaderboards where
+     * nobody has points yet are left out.
      *
      * @param \stdClass[] $courses Keyed by id.
      * @param int $top How many top students.
@@ -74,6 +75,11 @@ class rankings {
                     ];
                 }
                 $me = $summary['me'] ?? null;
+                // Nobody has points yet: everyone shares first place, which says nothing.
+                $zero = \mod_leaderboard\output\board::format_number(0);
+                if (!array_filter(array_column($rows, 'points'), fn($points) => $points !== $zero)) {
+                    continue;
+                }
                 $result[$course->id] = [
                     'courseid' => (int) $course->id,
                     'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),

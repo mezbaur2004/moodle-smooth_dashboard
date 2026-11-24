@@ -53,6 +53,7 @@ class content {
             'courses' => null,
             'rankings' => null,
             'attendance' => [],
+            'coursestotal' => 0,
         ];
 
         if ($data['shownextclass'] || $data['showclasses']) {
@@ -82,10 +83,11 @@ class content {
             foreach ($shown as $course) {
                 $data['courses'][] = courses::card($course, $userid, config::number('todocount'));
             }
-            $data['morecourses'] = count($inprogress) > count($shown);
+            $data['coursestotal'] = count($inprogress);
         }
         if (config::show('leaderboard') && rankings::available()) {
-            $data['rankings'] = rankings::for_courses($inprogress);
+            // The same courses as the cards, so the section stays short.
+            $data['rankings'] = rankings::for_courses($shown);
         }
         if (config::show('attendance') && config::show('courses') && attendance::available()) {
             $data['attendance'] = attendance::for_courses($shown, $userid);

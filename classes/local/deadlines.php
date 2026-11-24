@@ -34,8 +34,8 @@ require_once($CFG->dirroot . '/calendar/lib.php');
 /**
  * What the current user has to do next, from Moodle's calendar action events: the same API the
  * Timeline block uses. Each activity decides whether an event still needs the user's action, so
- * submitted assignments and finished quizzes drop out, and each student's extensions and user or
- * group overrides are already applied to the dates.
+ * submitted assignments and finished quizzes drop out, and user and group overrides are already
+ * applied to the dates. Assignment extensions are not in the calendar, so they are applied here.
  */
 class deadlines {
     /** @var int Events per calendar API call (its maximum). */
@@ -51,8 +51,9 @@ class deadlines {
      * @param int $overduedays How far back to look for overdue items.
      * @param int $limit How many items at most.
      * @param int|null $now The current time (for tests).
-     * @return array[] Each with id, cmid, modname, name, courseid, course, type (due, open,
-     *     close, gradingdue or other), time, url, actionname, actionurl, actionable and itemcount.
+     * @return array[] Each with id, cmid, instance, modname, name, courseid, course, type (due,
+     *     open, close, gradingdue or other), time, extended (an assignment extension moved it), url,
+     *     actionname, actionurl, actionable and itemcount.
      */
     public static function upcoming(array $modules, int $days, int $overduedays, int $limit, ?int $now = null): array {
         if (!$modules || $limit < 1) {
@@ -81,6 +82,78 @@ class deadlines {
                 break;
             }
         }
+        if (isset($modules['assign'])) {
+            $rows = self::apply_extensions($rows, $modules, $from, $to);
+        }
+        usort($rows, function (array $a, array $b) {
+            return ($a['time'] <=> $b['time']) ?: ($a['id'] <=> $b['id']);
+        });
+        return array_slice($rows, 0, $limit);
+    }
+
+    /**
+     * Move assignments to the current user's extension date.
+     *
+     * An extension is not a calendar event: the assignment's event keeps its due date, so without
+     * this an extended assignment would show as overdue, or not at all once its due date has left
+     * the overdue period. Assignments with an extension in the period are rebuilt from their due
+     * event (the user's own override event when they have one), and the assignment decides as
+     * usual whether it still needs the user.
+     *
+     * @param array[] $rows From export().
+     * @param array $modules Module names as keys.
+     * @param int $from
+     * @param int $to
+     * @return array[]
+     */
+    protected static function apply_extensions(array $rows, array $modules, int $from, int $to): array {
+        global $DB, $USER;
+        $extensions = $DB->get_records_select_menu(
+            'assign_user_flags',
+            'userid = :userid AND extensionduedate >= :from AND extensionduedate <= :to',
+            ['userid' => $USER->id, 'from' => $from, 'to' => $to],
+            '',
+            'assignment, extensionduedate'
+        );
+        if (!$extensions) {
+            return $rows;
+        }
+        $rows = array_values(array_filter($rows, function (array $row) use ($extensions) {
+            return !($row['modname'] === 'assign' && $row['type'] === 'due' && isset($extensions[$row['instance']]));
+        }));
+
+        [$insql, $params] = $DB->get_in_or_equal(array_keys($extensions), SQL_PARAMS_NAMED);
+        // The assignment's own due event (no priority; its userid is whoever created it), or the
+        // user's override event (with a priority).
+        $params += ['modulename' => 'assign', 'eventtype' => 'due', 'userid' => $USER->id];
+        $records = $DB->get_records_select(
+            'event',
+            "modulename = :modulename AND eventtype = :eventtype AND instance $insql AND groupid = 0
+             AND (priority IS NULL OR userid = :userid)",
+            $params,
+            'id ASC'
+        );
+        // One event per assignment: the user's override when there is one.
+        $chosen = [];
+        foreach ($records as $record) {
+            if (!isset($chosen[$record->instance]) || $record->priority !== null) {
+                $chosen[$record->instance] = $record;
+            }
+        }
+        \core_calendar\local\event\container::set_requesting_user($USER->id);
+        $factory = \core_calendar\local\event\container::get_event_factory();
+        foreach ($chosen as $record) {
+            $event = $factory->create_instance($record);
+            if (!$event instanceof action_event_interface) {
+                continue;
+            }
+            $row = self::export($event, $modules);
+            if ($row) {
+                $row['time'] = max($row['time'], (int) $extensions[$record->instance]);
+                $row['extended'] = true;
+                $rows[] = $row;
+            }
+        }
         return $rows;
     }
 
@@ -107,6 +180,7 @@ class deadlines {
         return [
             'id' => (int) $event->get_id(),
             'cmid' => (int) $cm->id,
+            'instance' => (int) $cm->instance,
             'modname' => $cm->modname,
             'modtype' => get_string('modulename', $cm->modname),
             'name' => $cm->get_formatted_name(),
@@ -114,6 +188,7 @@ class deadlines {
             'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),
             'type' => in_array($type, ['due', 'open', 'close', 'gradingdue']) ? $type : 'other',
             'time' => $event->get_times()->get_sort_time()->getTimestamp(),
+            'extended' => false,
             'url' => $cm->url ? $cm->url->out(false) : (new \moodle_url('/course/view.php', ['id' => $course->id]))->out(false),
             'actionname' => $action->get_name(),
             'actionurl' => $action->get_url()->out(false),

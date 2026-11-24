@@ -89,7 +89,8 @@ final class dashboard_test extends \advanced_testcase {
                 $item('Tonight', $now + 8 * HOURSECS),
                 $item('Tomorrow', $now + DAYSECS),
                 $item('Later', $now + 3 * DAYSECS),
-                $item('Opened', $now - HOURSECS, 'open'),
+                $item('Opened', $now - DAYSECS, 'open'),
+                ['extended' => true] + $item('Extended', $now + DAYSECS),
             ],
         ]);
         $context = $dashboard->export_for_template($PAGE->get_renderer('block_smooth_dashboard'));
@@ -100,10 +101,16 @@ final class dashboard_test extends \advanced_testcase {
         $this->assertSame(['Next'], array_column($context['classes'], 'name'));
         $classes = json_decode($context['classesjson'], true);
         $this->assertSame('Fish & Chips', $classes[0]['course']);
-        $this->assertSame(['overdue', 'today', 'tomorrow', 'later', 'today'], array_column($context['deadlines'], 'status'));
+        $this->assertSame(
+            ['overdue', 'today', 'tomorrow', 'later', 'open', 'tomorrow'],
+            array_column($context['deadlines'], 'status')
+        );
+        $this->assertSame('Open now', $context['deadlines'][4]['statustext']);
+        $this->assertStringStartsWith('Opened yesterday', $context['deadlines'][4]['when']);
+        $this->assertStringStartsWith('Extended to tomorrow', $context['deadlines'][5]['when']);
         $this->assertSame('In 3 days', $context['deadlines'][3]['statustext']);
         $this->assertStringStartsWith('Due today', $context['deadlines'][1]['when']);
-        $this->assertSame(['1 class today', '3 due soon'], array_column($context['greeting']['chips'], 'text'));
+        $this->assertSame(['1 class today', '4 due soon'], array_column($context['greeting']['chips'], 'text'));
 
         // With the next class card off, every class goes into Coming up.
         $dashboard = $this->dashboard($now, ['shownextclass' => false,
@@ -145,12 +152,26 @@ final class dashboard_test extends \advanced_testcase {
         }
         $this->assertSame('Report', json_decode($app['otherdata']['deadlines'], true)[0]['name']);
 
-        // Switched off sections are not built.
+        $this->assertSame('1', $app['otherdata']['showdeadlines']);
+
+        // Switched off sections are not built, and reach the app as empty (false) values: the app
+        // only decodes values that start with { or [.
         set_config('showdeadlines', 0, 'block_smooth_dashboard');
         set_config('showcourses', 0, 'block_smooth_dashboard');
         $data = content::build();
         $this->assertNull($data['deadlines']);
         $this->assertNull($data['courses']);
+        $app = mobile::mobile_block_view([]);
+        $this->assertSame('1', $app['otherdata']['show']);
+        $this->assertSame('', $app['otherdata']['showdeadlines']);
+        $this->assertSame('', $app['otherdata']['showcourses']);
+        $this->assertStringStartsWith('{', $app['otherdata']['greeting']);
+
+        // With the greeting off too, this student has nothing to see: the block stays hidden.
+        set_config('showgreeting', 0, 'block_smooth_dashboard');
+        $this->assertTrue(content::is_empty(content::build()));
+        $app = mobile::mobile_block_view([]);
+        $this->assertSame(['show' => ''], $app['otherdata']);
     }
 
     /**

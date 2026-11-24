@@ -72,6 +72,10 @@ class dashboard implements renderable, templatable {
             'shownextclass' => $this->data['shownextclass'],
             'next' => $this->data['shownextclass'] && $classes ? $this->export_next($classes[0]) : null,
             'classesjson' => json_encode(self::plain_classes($classes)),
+            'now' => $this->now,
+            // Formats for the countdown script, which fills in {h} and {m}.
+            'hoursformat' => get_string('durationhours', 'block_smooth_dashboard', (object) ['hours' => '{h}', 'minutes' => '{m}']),
+            'minutesformat' => get_string('durationminutes', 'block_smooth_dashboard', '{m}'),
             'showclasses' => $this->data['showclasses'],
             // The first class is in the hero when it is on; the list starts after it.
             'classes' => array_values(array_slice($classes, $this->data['shownextclass'] ? 1 : 0)),
@@ -79,7 +83,8 @@ class dashboard implements renderable, templatable {
             'deadlines' => $deadlines,
             'showcourses' => $this->data['courses'] !== null,
             'courses' => $courses,
-            'morecourses' => !empty($this->data['morecourses']),
+            'coursestotal' => (int) ($this->data['coursestotal'] ?? 0),
+            'morecourses' => count($courses) < (int) ($this->data['coursestotal'] ?? 0),
             'mycoursesurl' => (new \moodle_url('/my/courses.php'))->out(false),
             'showrankings' => (bool) $rankings,
             'rankings' => $rankings,
@@ -207,10 +212,15 @@ class dashboard implements renderable, templatable {
         $rows = [];
         foreach ($this->data['deadlines'] ?? [] as $item) {
             $days = $this->days_from_today($item['time']);
-            $overdue = $item['time'] < $this->now && $item['type'] !== 'open';
+            $past = $item['time'] < $this->now;
+            // An activity that has opened is ready to do, not late.
+            $overdue = $past && $item['type'] !== 'open';
             if ($overdue) {
                 $status = 'overdue';
                 $statustext = get_string('statusoverdue', 'block_smooth_dashboard');
+            } else if ($past) {
+                $status = 'open';
+                $statustext = get_string('statusopen', 'block_smooth_dashboard');
             } else if ($days <= 0) {
                 $status = 'today';
                 $statustext = get_string('statustoday', 'block_smooth_dashboard');
@@ -221,20 +231,30 @@ class dashboard implements renderable, templatable {
                 $status = 'later';
                 $statustext = get_string('statusindays', 'block_smooth_dashboard', $days);
             }
+            if (!empty($item['extended'])) {
+                $whenkey = 'eventextended';
+            } else if ($item['type'] === 'open' && $past) {
+                $whenkey = 'eventopened';
+            } else {
+                $whenkey = 'event' . $item['type'];
+            }
             $rows[] = $item + [
                 'days' => $days,
                 'overdue' => $overdue,
                 'status' => $status,
                 'statustext' => $statustext,
-                'when' => get_string('event' . $item['type'], 'block_smooth_dashboard', (object) [
+                'when' => get_string($whenkey, 'block_smooth_dashboard', (object) [
                     'day' => $this->day_label($item['time'], $item['type'] !== 'other'),
                     'time' => $this->time($item['time']),
                 ]),
                 'iconurl' => $OUTPUT->image_url('monologo', $item['modname'])->out(false),
-                'actiontext' => $item['itemcount'] > 1
+                // The calendar marks an activity that has not opened yet as not actionable, and still
+                // names its action ("Attempt quiz now"): say why it cannot be done instead.
+                'actiontext' => !$item['actionable'] ? get_string('notopenyet', 'block_smooth_dashboard')
+                    : ($item['itemcount'] > 1
                     ? get_string('actioncount', 'block_smooth_dashboard', (object) [
                         'action' => $item['actionname'], 'count' => $item['itemcount']])
-                    : $item['actionname'],
+                    : $item['actionname']),
             ];
         }
         return $rows;

@@ -6,16 +6,16 @@ in a clean card layout that works on phones and in the Moodle app.
 | Section | What it shows |
 |---|---|
 | **Greeting** | "Good morning, Rafi", today's date and a one-line summary: classes today, things due soon |
-| **Next class** | The next Zoom class with a live countdown, *Starting soon* from 15 minutes before, *Live now* with the time left while it runs, and a **Join** button. When it ends, the card moves on to the following class by itself |
+| **Next class** | The next Zoom class with a live countdown, *Starting soon* from 15 minutes before, *Live now* with the time left while it runs, and a **Join** button. When it ends, the card moves on to the following class by itself. On a device whose clock is more than a minute off, the website's countdown follows the server's clock |
 | **Coming up** | The Zoom classes after that one, with day and time |
-| **Due soon** | Quizzes and assignments still to do, overdue ones first, each with its status (*Overdue*, *Today*, *Tomorrow*, *In 3 days*) and its action (*Add submission*, *Attempt quiz now*) |
+| **Due soon** | Quizzes and assignments still to do, overdue ones first, each with its status (*Overdue*, *Today*, *Tomorrow*, *In 3 days*, *Open now*) and its action (*Add submission*, *Attempt quiz now*, or *Not open yet*) |
 | **My courses** | A card per course in progress: completion progress, how many activities are left, the next ones in course order (*Up next*), Zoom attendance and leaderboard place, and a **Continue** button to the first activity left |
-| **Leaderboards** | Per course with a leaderboard: the top 3 and the student's own place |
+| **Leaderboards** | For the courses with a card that have a leaderboard: the top 3 and the student's own place. A leaderboard where nobody has points yet is left out |
 
 Every section can be switched off for the whole site. A section with nothing to show shows a short
 friendly message (*All caught up*, *No classes scheduled*). Statuses are always written out, so
-nothing relies on colour alone, and the ticking countdown is hidden from screen readers, which
-read the start time instead.
+nothing relies on colour alone, text colours meet WCAG AA contrast (checked with axe), and the
+ticking countdown is hidden from screen readers, which read the start time instead.
 
 Teachers see the same layout: their classes, the grading the calendar asks of them, their courses
 (without progress, which Moodle only tracks for students) and the leaderboards.
@@ -61,7 +61,7 @@ The block only goes on the Dashboard. One per page.
 | Due soon ahead (days) | 14 | How far ahead to look for due dates |
 | Overdue kept (days) | 7 | How long overdue items stay listed (while they can still be submitted) |
 | Items listed | 6 | Most items in *Due soon* |
-| Courses shown | 6 | Course cards, the most recently visited course first |
+| Courses shown | 6 | Course cards, the most recently visited course first; with more courses in progress, the link says *All 9 courses* |
 | Activities listed per course | 3 | Activities under *Up next* on each card |
 
 ## Where the data comes from
@@ -73,9 +73,10 @@ The block stores nothing of its own. It reads:
   time have no schedule, so they are not listed. Only classes of Zoom activities the student can
   open appear, so hidden activities and access restrictions are respected. **Join** opens
   mod_zoom's own join link.
-- **Due soon:** Moodle's calendar action events, the same API as the Timeline block. Each student's
-  extensions and user or group overrides are already applied, and items drop out once they are
-  submitted or attempted.
+- **Due soon:** Moodle's calendar action events, the same API as the Timeline block, so user and
+  group overrides are applied and items drop out once they are submitted or attempted. Assignment
+  extensions are not in the calendar, so the block applies them itself: an extended assignment
+  shows its new date (*Extended to tomorrow, 4:00 PM*), not *Overdue*.
 - **Courses:** the student's courses in progress, as *My courses* classifies them (courses they
   removed from view there are left out). Progress and *Up next* come from activity completion.
 - **Leaderboards:** `\mod_leaderboard\api::find_course_leaderboard()` and
@@ -88,7 +89,8 @@ The block stores nothing of its own. It reads:
 ## Moodle app
 
 The block also shows on the Moodle app's Dashboard, with the same sections as native app cards
-and lists, and the countdown ticking. Tapping a class, activity or course opens it in the app.
+and lists, and the countdown ticking (by the device's clock: the app keeps block content for a
+while). Tapping a class, activity or course opens it in the app.
 The site needs mobile services enabled. After installing or upgrading, purge Moodle's caches;
 app users may need to log out and in again.
 
@@ -96,8 +98,9 @@ app users may need to log out and in again.
 
 The block uses its own scoped styles (everything under `.block_smooth_dashboard .sd`), with inline
 icons, so it looks the same in Boost and in other themes such as New Learning. It picks up the
-theme's Bootstrap colours where the theme defines them, and has darker-mode colours for themes
-that set `data-bs-theme="dark"` (not yet tested with a dark theme).
+theme's Bootstrap colours where the theme defines them, and has dark-mode colours (and light
+activity icons) for themes that set `data-bs-theme="dark"`. Accent tints use `color-mix()` where
+the browser supports it, with plain colours otherwise.
 
 ## Privacy
 
