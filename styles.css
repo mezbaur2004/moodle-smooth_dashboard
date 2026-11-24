@@ -1,5 +1,6 @@
 /* Smooth dashboard. Everything is scoped to .sd, so the block never restyles the rest of the page.
-   Colours follow the theme where it defines Bootstrap's variables, and fall back to neutral ones. */
+   Colours follow the theme where it defines Bootstrap's variables, and fall back to neutral ones.
+   Accent tints use color-mix() where the browser has it (at the end), plain colours otherwise. */
 
 .block_smooth_dashboard .sd {
     --sd-accent: var(--sd-accent-site, var(--bs-primary, #4f46e5));
@@ -12,15 +13,15 @@
     --sd-shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 24px rgba(17, 24, 39, .06);
     --sd-radius: 18px;
     --sd-radius-sm: 12px;
-    --sd-green: #16a34a;
+    --sd-green: #166534;
     --sd-green-bg: rgba(22, 163, 74, .12);
-    --sd-orange: #d97706;
+    --sd-orange: #9a3412;
     --sd-orange-bg: rgba(217, 119, 6, .13);
-    --sd-red: #dc2626;
+    --sd-red: #b91c1c;
     --sd-red-bg: rgba(220, 38, 38, .11);
-    --sd-blue: #2563eb;
+    --sd-blue: #1d4ed8;
     --sd-blue-bg: rgba(37, 99, 235, .11);
-    --sd-violet: #7c3aed;
+    --sd-violet: #6d28d9;
     --sd-violet-bg: rgba(124, 58, 237, .11);
     color: var(--sd-text);
     display: flex;
@@ -29,8 +30,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-[data-bs-theme="dark"] .block_smooth_dashboard .sd,
-.block_smooth_dashboard .sd.sd-dark {
+[data-bs-theme="dark"] .block_smooth_dashboard .sd {
     --sd-border: rgba(255, 255, 255, .1);
     --sd-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 24px rgba(0, 0, 0, .25);
     --sd-green: #4ade80;
@@ -38,6 +38,16 @@
     --sd-red: #f87171;
     --sd-blue: #60a5fa;
     --sd-violet: #a78bfa;
+}
+
+[data-bs-theme="dark"] .block_smooth_dashboard .sd .sd-pill-rank {
+    color: #fcd34d;
+}
+
+/* Activity icons are dark line drawings: light ones on a dark theme. */
+[data-bs-theme="dark"] .block_smooth_dashboard .sd-mod img,
+[data-bs-theme="dark"] .block_smooth_dashboard .sd-todo-icon {
+    filter: invert(1);
 }
 
 /* The block's own frame steps back: the dashboard brings its own cards. */
@@ -62,7 +72,7 @@
 
 .block_smooth_dashboard .sd a:focus-visible,
 .block_smooth_dashboard .sd .sd-btn:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--sd-accent) 45%, transparent);
+    outline: 3px solid var(--sd-accent);
     outline-offset: 2px;
     border-radius: 6px;
 }
@@ -151,7 +161,7 @@
     background:
         radial-gradient(120% 140% at 100% 0%, rgba(255, 255, 255, .18) 0%, transparent 55%),
         linear-gradient(135deg, var(--sd-accent) 0%, var(--sd-accent-2) 100%);
-    box-shadow: 0 10px 30px color-mix(in srgb, var(--sd-accent) 30%, transparent);
+    box-shadow: 0 10px 30px rgba(17, 24, 39, .18);
 }
 
 .block_smooth_dashboard .sd-hero::after {
@@ -371,7 +381,7 @@
     align-self: flex-start;
     margin-top: auto;
     color: var(--sd-accent);
-    background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
+    background: var(--sd-surface-2);
     padding: .5rem 1rem;
     font-size: .9rem;
 }
@@ -560,6 +570,10 @@
     opacity: .75;
 }
 
+.block_smooth_dashboard .sd-date.is-today .sd-date-month {
+    opacity: 1;
+}
+
 .block_smooth_dashboard .sd-mod {
     display: inline-flex;
     align-items: center;
@@ -604,6 +618,11 @@
 .block_smooth_dashboard .sd-status-tomorrow {
     color: var(--sd-blue);
     background: var(--sd-blue-bg);
+}
+
+.block_smooth_dashboard .sd-status-open {
+    color: var(--sd-green);
+    background: var(--sd-green-bg);
 }
 
 .block_smooth_dashboard .sd-action {
@@ -655,9 +674,15 @@
 .block_smooth_dashboard .sd-course-banner {
     display: block;
     height: 84px;
+    overflow: hidden;
     background-color: var(--sd-surface-2);
-    background-size: cover;
-    background-position: center;
+}
+
+.block_smooth_dashboard .sd-course-banner img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .block_smooth_dashboard .sd-course-body {
@@ -744,7 +769,7 @@
 }
 
 .block_smooth_dashboard .sd .sd-pill-rank {
-    color: #b45309;
+    color: #92400e;
     background: rgba(245, 158, 11, .15);
 }
 
@@ -825,7 +850,7 @@
 }
 
 .block_smooth_dashboard .sd-rank.is-me {
-    background: color-mix(in srgb, var(--sd-accent) 10%, transparent);
+    background: var(--sd-surface-2);
 }
 
 .block_smooth_dashboard .sd-medal {
@@ -880,7 +905,7 @@
     font-size: .88rem;
     font-weight: 600;
     color: var(--sd-accent);
-    background: color-mix(in srgb, var(--sd-accent) 10%, transparent);
+    background: var(--sd-surface-2);
 }
 
 /* Small screens. */
@@ -924,5 +949,26 @@
     .block_smooth_dashboard .sd-course:hover,
     .block_smooth_dashboard .sd .sd-btn:hover {
         transform: none;
+    }
+}
+
+/* Accent tints, for browsers with color-mix(). */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+    .block_smooth_dashboard .sd a:focus-visible,
+    .block_smooth_dashboard .sd .sd-btn:focus-visible {
+        outline-color: color-mix(in srgb, var(--sd-accent) 45%, transparent);
+    }
+
+    .block_smooth_dashboard .sd-hero {
+        box-shadow: 0 10px 30px color-mix(in srgb, var(--sd-accent) 30%, transparent);
+    }
+
+    .block_smooth_dashboard .sd .sd-btn-soft {
+        background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
+    }
+
+    .block_smooth_dashboard .sd-rank.is-me,
+    .block_smooth_dashboard .sd-you {
+        background: color-mix(in srgb, var(--sd-accent) 10%, transparent);
     }
 }

@@ -83,4 +83,40 @@ final class deadlines_test extends \advanced_testcase {
         ]);
         $this->assertSame([], deadlines::upcoming(['assign'], 14, 7, 10, $now));
     }
+
+    /**
+     * An extension moves an assignment to its new date, also when the original due date is older
+     * than the overdue period; other students keep the original date.
+     */
+    public function test_extensions(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+        $this->resetAfterTest();
+        $now = time();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $user = $generator->create_and_enrol($course, 'student');
+        $other = $generator->create_and_enrol($course, 'student');
+        $common = ['course' => $course->id, 'assignsubmission_onlinetext_enabled' => 1, 'cutoffdate' => 0,
+            'allowsubmissionsfromdate' => 0];
+        $recent = $generator->create_module('assign', $common + ['name' => 'Recent', 'duedate' => $now - DAYSECS]);
+        $old = $generator->create_module('assign', $common + ['name' => 'Old', 'duedate' => $now - 30 * DAYSECS]);
+        $this->setAdminUser();
+        foreach ([$recent, $old] as $i => $module) {
+            $assign = new \assign(\context_module::instance($module->cmid), false, false);
+            $assign->save_user_extension($user->id, $now + ($i + 1) * DAYSECS);
+        }
+
+        $this->setUser($user);
+        $items = deadlines::upcoming(['assign'], 14, 7, 10, $now);
+        $this->assertSame(['Recent', 'Old'], array_column($items, 'name'));
+        $this->assertSame([$now + DAYSECS, $now + 2 * DAYSECS], array_column($items, 'time'));
+        $this->assertSame([true, true], array_column($items, 'extended'));
+
+        $this->setUser($other);
+        $items = deadlines::upcoming(['assign'], 14, 7, 10, $now);
+        $this->assertSame(['Recent'], array_column($items, 'name'));
+        $this->assertSame($now - DAYSECS, $items[0]['time']);
+        $this->assertFalse($items[0]['extended']);
+    }
 }

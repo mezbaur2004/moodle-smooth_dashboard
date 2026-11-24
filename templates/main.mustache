@@ -25,7 +25,8 @@
 
     Example context (json):
     {
-        "uniqid": "smooth-dashboard-1", "style": "",
+        "uniqid": "smooth-dashboard-1", "style": "", "now": 1764000000,
+        "hoursformat": "{h} h {m} min", "minutesformat": "{m} min",
         "greeting": {"text": "Good evening, Rafi", "date": "Monday, 24 November 2026",
             "chips": [{"text": "2 classes today", "kind": "class"}]},
         "shownextclass": true,
@@ -41,7 +42,7 @@
         "deadlines": [{"name": "Essay 2", "course": "English", "modtype": "Assignment", "iconurl": "#",
             "url": "#", "actionurl": "#", "actiontext": "Add submission", "actionable": true,
             "status": "today", "statustext": "Due today", "when": "Due today, 11:59 PM"}],
-        "showcourses": true, "hascourses": true, "morecourses": false, "mycoursesurl": "#",
+        "showcourses": true, "hascourses": true, "morecourses": false, "coursestotal": 1, "mycoursesurl": "#",
         "courses": [{"id": 2, "name": "Physics 101", "url": "#", "image": "#", "hasprogress": true, "progress": 40,
             "done": false, "todotext": "5 to do", "hastodo": true, "todomore": 2, "continueurl": "#",
             "todo": [{"name": "Quiz 3", "url": "#", "iconurl": "#", "modtype": "Quiz"}],
@@ -53,7 +54,8 @@
         "calendarurl": "#"
     }
 }}
-<div class="sd" id="{{uniqid}}" data-region="smooth-dashboard"{{#style}} style="{{style}}"{{/style}}>
+<div class="sd" id="{{uniqid}}" data-region="smooth-dashboard"{{#style}} style="{{style}}"{{/style}}
+        data-classes="{{classesjson}}" data-now="{{now}}" data-hoursformat="{{hoursformat}}" data-minutesformat="{{minutesformat}}">
     {{#greeting}}
     <header class="sd-hello">
         <div>

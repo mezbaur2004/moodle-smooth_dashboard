@@ -18,12 +18,13 @@
     @template block_smooth_dashboard/courses
 
     Course cards: progress, what is left to do (first activities in course order), Zoom
-    attendance and leaderboard place. The most recently visited course comes first.
+    attendance and leaderboard place. The most recently visited course comes first. When not
+    every course in progress has a card, the link says how many there are.
 
     Example context (json):
     {
         "uniqid": "smooth-dashboard-1",
-        "hascourses": true, "morecourses": true, "mycoursesurl": "#",
+        "hascourses": true, "morecourses": true, "coursestotal": 9, "mycoursesurl": "#",
         "courses": [{"id": 2, "name": "Physics 101", "url": "#", "image": "#", "hasprogress": true, "progress": 40,
             "done": false, "todotext": "5 to do", "hastodo": true, "todomore": 2, "continueurl": "#",
             "todo": [{"name": "Quiz 3", "url": "#", "iconurl": "#", "modtype": "Quiz", "failed": false}],
@@ -34,13 +35,18 @@
 <section class="sd-section" aria-labelledby="{{uniqid}}-courses">
     <div class="sd-section-head">
         <h4 class="sd-section-title" id="{{uniqid}}-courses">{{#str}}mycourses, block_smooth_dashboard{{/str}}</h4>
-        <a class="sd-link" href="{{mycoursesurl}}">{{#str}}allcourses, block_smooth_dashboard{{/str}}</a>
+        <a class="sd-link" href="{{mycoursesurl}}">
+            {{#morecourses}}{{#str}}allcoursescount, block_smooth_dashboard, {{coursestotal}}{{/str}}{{/morecourses}}
+            {{^morecourses}}{{#str}}allcourses, block_smooth_dashboard{{/str}}{{/morecourses}}
+        </a>
     </div>
     {{#hascourses}}
     <div class="sd-courses">
         {{#courses}}
         <article class="sd-course">
-            <a class="sd-course-banner" href="{{url}}" style="background-image: url('{{{image}}}');" tabindex="-1" aria-hidden="true"></a>
+            <a class="sd-course-banner" href="{{url}}" tabindex="-1" aria-hidden="true">
+                <img src="{{image}}" alt="" loading="lazy">
+            </a>
             <div class="sd-course-body">
                 <h5 class="sd-course-name"><a href="{{url}}">{{{name}}}</a></h5>
 
