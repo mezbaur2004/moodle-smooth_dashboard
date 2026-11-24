@@ -1,0 +1,86 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_smooth_dashboard/nextclass
+
+    The next Zoom class with a countdown. It is rendered as it is at page load;
+    block_smooth_dashboard/countdown then ticks every second, switches to "Live now" at the
+    start and moves on to the following class (from classesjson) when it ends.
+
+    What each state shows is up to the styles: is-live, is-soon, is-empty and no-days (under a
+    day to go) on the card, against the data-show attributes inside it. So the card is right
+    before the script runs. The ticking digits are hidden from screen readers, which read the
+    start time instead.
+
+    Example context (json):
+    {
+        "classesjson": "[]",
+        "next": {"name": "Physics live class", "course": "Physics 101", "url": "#", "joinurl": "#",
+            "day": "Today", "when": "Today, 7:00 PM", "range": "7:00 PM – 8:30 PM", "live": false, "soon": true,
+            "endsin": "", "startsat": "Starts today, 7:00 PM",
+            "units": [{"unit": "minutes", "value": "12", "label": "min"}]}
+    }
+}}
+<section class="sd-hero{{#next.live}} is-live{{/next.live}}{{#next.soon}} is-soon{{/next.soon}}{{#next.nodays}} no-days{{/next.nodays}}{{^next}} is-empty{{/next}}"
+        data-region="nextclass" data-classes="{{classesjson}}"
+        aria-labelledby="{{uniqid}}-next">
+    <div class="sd-hero-main">
+        <div class="sd-hero-top">
+            <h4 class="sd-eyebrow" id="{{uniqid}}-next">{{#str}}nextclass, block_smooth_dashboard{{/str}}</h4>
+            <span class="sd-badge sd-badge-live" data-show="live">
+                <span class="sd-dot" aria-hidden="true"></span>{{#str}}livenow, block_smooth_dashboard{{/str}}
+            </span>
+            <span class="sd-badge sd-badge-soon" data-show="soon">{{#str}}startingsoon, block_smooth_dashboard{{/str}}</span>
+        </div>
+
+        <div class="sd-hero-class" data-show="class">
+            <a class="sd-hero-name" href="{{next.url}}{{^next}}#{{/next}}" data-field="name" data-link="url">{{{next.name}}}</a>
+            <div class="sd-hero-course" data-field="course">{{{next.course}}}</div>
+            <div class="sd-hero-when">
+                <svg class="sd-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <span data-field="day">{{next.day}}</span>
+                <span class="sd-sep" aria-hidden="true">·</span>
+                <span data-field="range">{{next.range}}</span>
+            </div>
+        </div>
+
+        <div class="sd-hero-empty" data-show="empty">
+            <div class="sd-hero-name">{{#str}}noclasses, block_smooth_dashboard{{/str}}</div>
+            <div class="sd-hero-course">{{#str}}noclasses_help, block_smooth_dashboard{{/str}}</div>
+        </div>
+    </div>
+
+    <div class="sd-hero-side" data-show="class">
+        <div class="sd-countdown" data-show="countdown" aria-hidden="true">
+            {{#next.units}}
+            <div class="sd-unit" data-unit="{{unit}}">
+                <span class="sd-unit-value" data-field="{{unit}}">{{value}}</span>
+                <span class="sd-unit-label">{{label}}</span>
+            </div>
+            {{/next.units}}
+        </div>
+        <span class="sr-only visually-hidden" data-field="startsat">{{next.startsat}}</span>
+        <div class="sd-endsin" data-show="live">
+            {{#str}}endsin, block_smooth_dashboard{{/str}} <strong data-field="endsin">{{next.endsin}}</strong>
+        </div>
+        <a class="sd-btn sd-btn-join" href="{{next.joinurl}}{{^next}}#{{/next}}" data-link="joinurl">
+            <svg class="sd-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg>
+            <span data-show="live">{{#str}}joinnow, block_smooth_dashboard{{/str}}</span>
+            <span data-show="notlive">{{#str}}joinclass, block_smooth_dashboard{{/str}}</span>
+        </a>
+    </div>
+</section>

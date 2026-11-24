@@ -1,0 +1,88 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_smooth_dashboard/main
+
+    The whole dashboard: greeting, next class with a live countdown, coming up, due soon,
+    course cards and leaderboards. Each section only appears when it is switched on.
+
+    Names from format_string() are already HTML-safe and use triple braces; everything else is
+    plain text.
+
+    Example context (json):
+    {
+        "uniqid": "smooth-dashboard-1", "style": "",
+        "greeting": {"text": "Good evening, Rafi", "date": "Monday, 24 November 2026",
+            "chips": [{"text": "2 classes today", "kind": "class"}]},
+        "shownextclass": true,
+        "next": {"name": "Physics live class", "course": "Physics 101", "url": "#", "joinurl": "#",
+            "day": "Today", "when": "Today, 7:00 PM", "range": "7:00 PM – 8:30 PM", "live": false, "soon": false,
+            "start": 1764000000, "end": 1764005400, "endsin": "", "startsat": "Starts today, 7:00 PM",
+            "units": [{"unit": "days", "value": "00", "label": "days"}]},
+        "classesjson": "[]",
+        "showclasses": true, "hasclasses": true,
+        "classes": [{"index": 1, "name": "Chemistry", "course": "Chemistry 101", "url": "#", "day": "Tomorrow",
+            "daynum": "25", "month": "Nov", "range": "7:00 PM – 8:30 PM", "start": 1764090000, "end": 1764095400}],
+        "showdeadlines": true, "hasdeadlines": true,
+        "deadlines": [{"name": "Essay 2", "course": "English", "modtype": "Assignment", "iconurl": "#",
+            "url": "#", "actionurl": "#", "actiontext": "Add submission", "actionable": true,
+            "status": "today", "statustext": "Due today", "when": "Due today, 11:59 PM"}],
+        "showcourses": true, "hascourses": true, "morecourses": false, "mycoursesurl": "#",
+        "courses": [{"id": 2, "name": "Physics 101", "url": "#", "image": "#", "hasprogress": true, "progress": 40,
+            "done": false, "todotext": "5 to do", "hastodo": true, "todomore": 2, "continueurl": "#",
+            "todo": [{"name": "Quiz 3", "url": "#", "iconurl": "#", "modtype": "Quiz"}],
+            "attendance": {"text": "92% attendance", "level": "good", "url": "#"},
+            "rank": {"text": "#2 of 48", "url": "#"}, "hasmeta": true}],
+        "showrankings": true,
+        "rankings": [{"course": "Physics 101", "url": "#", "metext": "You are #5 of 48 · 120 pts",
+            "meoutside": true, "rows": [{"rank": 1, "medal": 1, "name": "Rahim Uddin", "points": "240", "isme": false}]}],
+        "calendarurl": "#"
+    }
+}}
+<div class="sd" id="{{uniqid}}" data-region="smooth-dashboard"{{#style}} style="{{style}}"{{/style}}>
+    {{#greeting}}
+    <header class="sd-hello">
+        <div>
+            <h3 class="sd-hello-title">{{text}}</h3>
+            <p class="sd-hello-date">{{date}}</p>
+        </div>
+        <ul class="sd-chips" aria-label="{{#str}}todaysummary, block_smooth_dashboard{{/str}}">
+            {{#chips}}<li class="sd-chip sd-chip-{{kind}}">{{text}}</li>{{/chips}}
+        </ul>
+    </header>
+    {{/greeting}}
+
+    {{#shownextclass}}
+        {{> block_smooth_dashboard/nextclass }}
+    {{/shownextclass}}
+
+    {{#showside}}
+    <div class="sd-grid">
+        {{#showclasses}}{{> block_smooth_dashboard/classes }}{{/showclasses}}
+        {{#showdeadlines}}{{> block_smooth_dashboard/deadlines }}{{/showdeadlines}}
+    </div>
+    {{/showside}}
+
+    {{#showcourses}}{{> block_smooth_dashboard/courses }}{{/showcourses}}
+
+    {{#showrankings}}{{> block_smooth_dashboard/rankings }}{{/showrankings}}
+</div>
+{{#js}}
+require(['block_smooth_dashboard/countdown'], function(countdown) {
+    countdown.init('{{uniqid}}');
+});
+{{/js}}
