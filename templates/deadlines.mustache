@@ -1,0 +1,69 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_smooth_dashboard/deadlines
+
+    Due soon: quizzes and assignments that still need the user, overdue ones first. The status
+    is written out, so it never relies on colour alone.
+
+    Example context (json):
+    {
+        "uniqid": "smooth-dashboard-1",
+        "hasdeadlines": true,
+        "deadlines": [{"name": "Essay 2", "course": "English", "modtype": "Assignment", "iconurl": "#",
+            "url": "#", "actionurl": "#", "actiontext": "Add submission", "actionable": true,
+            "status": "today", "statustext": "Due today", "when": "Due today, 11:59 PM"}]
+    }
+}}
+<section class="sd-card" aria-labelledby="{{uniqid}}-deadlines">
+    <div class="sd-card-head">
+        <h4 class="sd-card-title" id="{{uniqid}}-deadlines">
+            <span class="sd-card-icon sd-tone-orange" aria-hidden="true"><svg class="sd-icon" viewBox="0 0 24 24"><path d="M9 4h6M12 4v3"/><circle cx="12" cy="14" r="7"/><path d="M12 11v3l2 1"/></svg></span>
+            {{#str}}duesoon, block_smooth_dashboard{{/str}}
+        </h4>
+    </div>
+    {{#hasdeadlines}}
+    <ul class="sd-list">
+        {{#deadlines}}
+        <li class="sd-item is-{{status}}">
+            <span class="sd-mod sd-mod-{{modname}}" aria-hidden="true"><img src="{{iconurl}}" alt=""></span>
+            <div class="sd-item-body">
+                <div class="sd-item-row">
+                    <a class="sd-item-title" href="{{url}}">{{{name}}}</a>
+                    <span class="sd-status sd-status-{{status}}">{{statustext}}</span>
+                </div>
+                <div class="sd-item-sub">{{modtype}} · {{{course}}}</div>
+                <div class="sd-item-row sd-item-foot">
+                    <span class="sd-item-sub">{{when}}</span>
+                    {{#actionable}}<a class="sd-action" href="{{actionurl}}">{{actiontext}}</a>{{/actionable}}
+                    {{^actionable}}<span class="sd-action is-disabled">{{actiontext}}</span>{{/actionable}}
+                </div>
+            </div>
+        </li>
+        {{/deadlines}}
+    </ul>
+    {{/hasdeadlines}}
+    {{^hasdeadlines}}
+    <div class="sd-allclear">
+        <span class="sd-card-icon sd-tone-green" aria-hidden="true"><svg class="sd-icon" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span>
+        <div>
+            <div class="sd-strong">{{#str}}allcaughtup, block_smooth_dashboard{{/str}}</div>
+            <div class="sd-item-sub">{{#str}}nodeadlines, block_smooth_dashboard{{/str}}</div>
+        </div>
+    </div>
+    {{/hasdeadlines}}
+</section>

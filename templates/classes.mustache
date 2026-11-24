@@ -1,0 +1,57 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_smooth_dashboard/classes
+
+    Coming up: the classes after the next one. Each item carries its index in classesjson, so
+    the countdown can drop it once it moves into the next class card.
+
+    Example context (json):
+    {
+        "uniqid": "smooth-dashboard-1",
+        "hasclasses": true, "calendarurl": "#",
+        "classes": [{"index": 1, "name": "Chemistry", "course": "Chemistry 101", "url": "#", "day": "Tomorrow",
+            "daynum": "25", "month": "Nov", "range": "7:00 PM – 8:30 PM", "istoday": false}]
+    }
+}}
+<section class="sd-card" aria-labelledby="{{uniqid}}-classes">
+    <div class="sd-card-head">
+        <h4 class="sd-card-title" id="{{uniqid}}-classes">
+            <span class="sd-card-icon sd-tone-blue" aria-hidden="true"><svg class="sd-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>
+            {{#str}}comingup, block_smooth_dashboard{{/str}}
+        </h4>
+        <a class="sd-link" href="{{calendarurl}}">{{#str}}calendar, block_smooth_dashboard{{/str}}</a>
+    </div>
+    <ul class="sd-list" data-region="classes">
+        {{#classes}}
+        <li class="sd-item" data-index="{{index}}">
+            <div class="sd-date{{#istoday}} is-today{{/istoday}}" aria-hidden="true">
+                <span class="sd-date-day">{{daynum}}</span>
+                <span class="sd-date-month">{{month}}</span>
+            </div>
+            <div class="sd-item-body">
+                <a class="sd-item-title" href="{{url}}">{{{name}}}</a>
+                <div class="sd-item-sub">{{{course}}}</div>
+                <div class="sd-item-sub"><span class="sd-strong">{{day}}</span> · {{range}}</div>
+            </div>
+        </li>
+        {{/classes}}
+    </ul>
+    <p class="sd-empty{{#hasclasses}} d-none{{/hasclasses}}" data-region="classes-empty">
+        {{#str}}nomoreclasses, block_smooth_dashboard{{/str}}
+    </p>
+</section>
