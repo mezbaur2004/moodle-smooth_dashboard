@@ -113,4 +113,31 @@ final class schedule_test extends \advanced_testcase {
         $this->assertCount(1, $classes);
         $this->assertSame($now - 30 * MINSECS + schedule::DEFAULT_LENGTH, $classes[0]['end']);
     }
+
+    /**
+     * Recurring meetings with no fixed time are listed as rooms, in course order, when the user
+     * can open them; meetings with a time and hidden ones are not.
+     */
+    public function test_rooms(): void {
+        $now = time();
+        $course = $this->getDataGenerator()->create_course(['fullname' => 'Spoken English']);
+        $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $notime = ['recurring' => 1, 'recurrence_type' => 0];
+        $room = $this->create_zoom($course, $now, HOURSECS, $notime + ['name' => 'Batch 1 class']);
+        $this->create_zoom($course, $now, HOURSECS, $notime + ['name' => 'Hidden room', 'visible' => 0]);
+        $this->create_zoom($course, $now + DAYSECS, HOURSECS, ['name' => 'Single meeting']);
+        $this->create_zoom($course, $now, HOURSECS, $notime + ['name' => 'Batch 2 class']);
+        $this->setUser($user);
+
+        $rooms = schedule::rooms([$course->id => $course], 5);
+        $this->assertSame(['Batch 1 class', 'Batch 2 class'], array_column($rooms, 'name'));
+        $this->assertSame((int) $room->cmid, $rooms[0]['cmid']);
+        $this->assertSame('Spoken English', $rooms[0]['course']);
+        $this->assertStringContainsString('/mod/zoom/loadmeeting.php?id=' . $room->cmid, $rooms[0]['joinurl']);
+        $this->assertCount(1, schedule::rooms([$course->id => $course], 1));
+        $this->assertSame([], schedule::rooms([], 5));
+
+        // Not upcoming classes: they have no time.
+        $this->assertSame(['Single meeting'], array_column(schedule::upcoming([$course->id => $course], 5, 14, $now), 'name'));
+    }
 }

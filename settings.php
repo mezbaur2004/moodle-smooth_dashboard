@@ -101,7 +101,7 @@ if ($ADMIN->fulltree) {
         "$plugin/overduedays",
         get_string('overduedays', $plugin),
         get_string('overduedays_desc', $plugin),
-        7,
+        30,
         PARAM_INT
     ));
     $settings->add(new admin_setting_configtext(

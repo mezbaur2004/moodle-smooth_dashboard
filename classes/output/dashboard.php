@@ -71,6 +71,8 @@ class dashboard implements renderable, templatable {
             'greeting' => $this->data['greeting'] ? $this->export_greeting($classes, $deadlines) : null,
             'shownextclass' => $this->data['shownextclass'],
             'next' => $this->data['shownextclass'] && $classes ? $this->export_next($classes[0]) : null,
+            // Recurring classes with no fixed time, on the card when no class has a time.
+            'rooms' => array_values($this->data['rooms'] ?? []),
             'classesjson' => json_encode(self::plain_classes($classes)),
             'now' => $this->now,
             // Formats for the countdown script, which fills in {h} and {m}.
@@ -91,6 +93,7 @@ class dashboard implements renderable, templatable {
             'calendarurl' => (new \moodle_url('/calendar/view.php', ['view' => 'upcoming']))->out(false),
         ];
         $context['hasclasses'] = (bool) $context['classes'];
+        $context['hasrooms'] = (bool) $context['rooms'];
         $context['hasdeadlines'] = (bool) $deadlines;
         $context['hascourses'] = (bool) $courses;
         $context['showside'] = $context['showclasses'] || $context['showdeadlines'];
@@ -112,9 +115,9 @@ class dashboard implements renderable, templatable {
         $classestoday = count(array_filter($classes, function ($class) {
             return $class['istoday'];
         }));
-        // Overdue, today or tomorrow; an activity opening is not something due.
+        // Overdue, today or tomorrow; an activity opening is not something due, nor is grading.
         $duesoon = count(array_filter($deadlines, function ($item) {
-            return $item['type'] !== 'open' && ($item['overdue'] || $item['days'] <= 1);
+            return !in_array($item['type'], ['open', 'tograde']) && ($item['overdue'] || $item['days'] <= 1);
         }));
         $chips = [];
         if ($classestoday) {
@@ -213,9 +216,12 @@ class dashboard implements renderable, templatable {
         foreach ($this->data['deadlines'] ?? [] as $item) {
             $days = $this->days_from_today($item['time']);
             $past = $item['time'] < $this->now;
-            // An activity that has opened is ready to do, not late.
-            $overdue = $past && $item['type'] !== 'open';
-            if ($overdue) {
+            // An activity that has opened is ready to do, not late; attempts to grade are not late either.
+            $overdue = $past && !in_array($item['type'], ['open', 'tograde']);
+            if ($item['type'] === 'tograde') {
+                $status = 'tograde';
+                $statustext = get_string('statustograde', 'block_smooth_dashboard');
+            } else if ($overdue) {
                 $status = 'overdue';
                 $statustext = get_string('statusoverdue', 'block_smooth_dashboard');
             } else if ($past) {
@@ -271,7 +277,8 @@ class dashboard implements renderable, templatable {
             $attendance = $this->data['attendance'][$card['id']] ?? null;
             $ranking = $this->data['rankings'][$card['id']] ?? null;
             $card['hasprogress'] = $card['progress'] !== null;
-            $card['done'] = $card['hasprogress'] && $card['todocount'] === 0;
+            // Not "All done" while activities that closed before being done are left.
+            $card['done'] = $card['hasprogress'] && $card['todocount'] === 0 && empty($card['closedcount']);
             $card['todomore'] = max(0, $card['todocount'] - count($card['todo']));
             $card['hastodo'] = (bool) $card['todo'];
             $card['todotext'] = $card['todocount']

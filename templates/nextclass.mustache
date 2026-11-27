@@ -31,7 +31,9 @@
         "next": {"name": "Physics live class", "course": "Physics 101", "url": "#", "joinurl": "#",
             "day": "Today", "when": "Today, 7:00 PM", "range": "7:00 PM – 8:30 PM", "live": false, "soon": true,
             "endsin": "", "startsat": "Starts today, 7:00 PM",
-            "units": [{"unit": "minutes", "value": "12", "label": "min"}]}
+            "units": [{"unit": "minutes", "value": "12", "label": "min"}]},
+        "hasrooms": true,
+        "rooms": [{"name": "Spoken English class", "course": "Spoken English", "url": "#", "joinurl": "#"}]
     }
 }}
 <section class="sd-hero{{#next.live}} is-live{{/next.live}}{{#next.soon}} is-soon{{/next.soon}}{{#next.nodays}} no-days{{/next.nodays}}{{^next}} is-empty{{/next}}"
@@ -58,8 +60,27 @@
         </div>
 
         <div class="sd-hero-empty" data-show="empty">
+            {{#hasrooms}}
+            <div class="sd-hero-name">{{#str}}classrooms, block_smooth_dashboard{{/str}}</div>
+            <div class="sd-hero-course">{{#str}}classrooms_help, block_smooth_dashboard{{/str}}</div>
+            <ul class="sd-rooms">
+                {{#rooms}}
+                <li class="sd-room">
+                    <span class="sd-room-text">
+                        <a class="sd-room-name" href="{{url}}">{{{name}}}</a>
+                        <span class="sd-room-course">{{{course}}}</span>
+                    </span>
+                    <a class="sd-btn sd-btn-soft" href="{{joinurl}}">
+                        {{#str}}joinclass, block_smooth_dashboard{{/str}}<span class="sr-only visually-hidden">: {{{name}}}</span>
+                    </a>
+                </li>
+                {{/rooms}}
+            </ul>
+            {{/hasrooms}}
+            {{^hasrooms}}
             <div class="sd-hero-name">{{#str}}noclasses, block_smooth_dashboard{{/str}}</div>
             <div class="sd-hero-course">{{#str}}noclasses_help, block_smooth_dashboard{{/str}}</div>
+            {{/hasrooms}}
         </div>
     </div>
 

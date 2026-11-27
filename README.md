@@ -6,10 +6,10 @@ in a clean card layout that works on phones and in the Moodle app.
 | Section | What it shows |
 |---|---|
 | **Greeting** | "Good morning, Rafi", today's date and a one-line summary: classes today, things due soon |
-| **Next class** | The next Zoom class with a live countdown, *Starting soon* from 15 minutes before, *Live now* with the time left while it runs, and a **Join** button. When it ends, the card moves on to the following class by itself. On a device whose clock is more than a minute off, the website's countdown follows the server's clock |
+| **Next class** | The next Zoom class with a live countdown, *Starting soon* from 15 minutes before, *Live now* with the time left while it runs, and a **Join** button. When it ends, the card moves on to the following class by itself. On a device whose clock is more than a minute off, the website's countdown follows the server's clock. With no class that has a time, the card lists the student's recurring classes that have no fixed time, each with **Join** |
 | **Coming up** | The Zoom classes after that one, with day and time |
-| **Due soon** | Quizzes and assignments still to do, overdue ones first, each with its status (*Overdue*, *Today*, *Tomorrow*, *In 3 days*, *Open now*) and its action (*Add submission*, *Attempt quiz now*, or *Not open yet*) |
-| **My courses** | A card per course in progress: completion progress, how many activities are left, the next ones in course order (*Up next*), Zoom attendance and leaderboard place, and a **Continue** button to the first activity left |
+| **Due soon** | Quizzes and assignments still to do, overdue ones first, each with its status (*Overdue*, *Today*, *Tomorrow*, *In 3 days*, *Open now*) and its action (*Add submission*, *Attempt quiz now*, or *Not open yet*). For teachers, also quizzes with attempts waiting for manual grading (*To grade*, *Grade (3)*) |
+| **My courses** | A card per course in progress: completion progress, how many activities are left, the next ones in course order (*Up next*), Zoom attendance and leaderboard place, and a **Continue** button to the first activity left. A quiz that has closed or an assignment past its cut-off date is no longer listed as left to do |
 | **Leaderboards** | For the courses with a card that have a leaderboard: the top 3 and the student's own place. A leaderboard where nobody has points yet is left out |
 
 Every section can be switched off for the whole site. A section with nothing to show shows a short
@@ -17,8 +17,13 @@ friendly message (*All caught up*, *No classes scheduled*). Statuses are always 
 nothing relies on colour alone, text colours meet WCAG AA contrast (checked with axe), and the
 ticking countdown is hidden from screen readers, which read the start time instead.
 
-Teachers see the same layout: their classes, the grading the calendar asks of them, their courses
-(without progress, which Moodle only tracks for students) and the leaderboards.
+Teachers see the same layout: their classes, the grading the calendar asks of them and the quiz
+attempts waiting for manual grading, their courses (without progress, which Moodle only tracks for
+students) and the leaderboards.
+
+Users with no courses of their own, such as parents and office staff, see nothing from the block:
+an empty student dashboard would tell a parent their child has no classes.
+
 
 ## Requirements
 
@@ -59,7 +64,7 @@ The block only goes on the Dashboard. One per page.
 | Classes ahead (days) | 14 | How far ahead to look for classes |
 | Activity types | Assignment, Quiz | Which activities *Due soon* lists |
 | Due soon ahead (days) | 14 | How far ahead to look for due dates |
-| Overdue kept (days) | 7 | How long overdue items stay listed (while they can still be submitted) |
+| Overdue kept (days) | 30 | How long overdue items stay listed (while they can still be submitted). Sites still on the old default of 7 are moved to 30 on upgrade |
 | Items listed | 6 | Most items in *Due soon* |
 | Courses shown | 6 | Course cards, the most recently visited course first; with more courses in progress, the link says *All 9 courses* |
 | Activities listed per course | 3 | Activities under *Up next* on each card |
@@ -70,15 +75,21 @@ The block stores nothing of its own. It reads:
 
 - **Classes:** the calendar events mod_zoom writes, one per scheduled class (a single meeting, or
   each occurrence of a recurring meeting with a fixed time). Recurring meetings without a fixed
-  time have no schedule, so they are not listed. Only classes of Zoom activities the student can
-  open appear, so hidden activities and access restrictions are respected. **Join** opens
-  mod_zoom's own join link.
+  time have no schedule, so they are not upcoming classes; when no class has a time, the Next
+  class card lists them instead. Only classes of Zoom activities the student can open appear, so
+  hidden activities and access restrictions are respected. **Join** opens mod_zoom's own join
+  link.
 - **Due soon:** Moodle's calendar action events, the same API as the Timeline block, so user and
   group overrides are applied and items drop out once they are submitted or attempted. Assignment
   extensions are not in the calendar, so the block applies them itself: an extended assignment
-  shows its new date (*Extended to tomorrow, 4:00 PM*), not *Overdue*.
+  shows its new date (*Extended to tomorrow, 4:00 PM*), not *Overdue*. Overdue items that can no
+  longer be done (an assignment past its cut-off date) are left out. Quizzes have no calendar
+  event for manual grading, so for teachers the block counts finished attempts that have no total
+  mark yet.
 - **Courses:** the student's courses in progress, as *My courses* classifies them (courses they
-  removed from view there are left out). Progress and *Up next* come from activity completion.
+  removed from view there are left out). Progress and *Up next* come from activity completion;
+  closed quizzes and assignments past their cut-off date (with the student's overrides and
+  extension) are not in *Up next*.
 - **Leaderboards:** `\mod_leaderboard\api::find_course_leaderboard()` and
   `\mod_leaderboard\output\board::export_summary(3)`, so the leaderboard's access checks, names
   and anonymous rules apply.

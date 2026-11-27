@@ -77,13 +77,19 @@ class courses {
     /**
      * A course's card: progress and the first activities left to complete, in course order.
      *
+     * Activities that can no longer be done (a closed quiz, an assignment past its cut-off date)
+     * are not "to do": they are counted in closedcount instead.
+     *
      * @param \stdClass $course
      * @param int $userid
      * @param int $todolimit How many activities left to list.
+     * @param int|null $now The current time (for tests).
      * @return array With id, name, url, image, progress (int or null when completion is not
-     *     tracked for the user), todo (each with cmid, name, url, modname, iconurl), todocount.
+     *     tracked for the user), todo (each with cmid, name, url, modname, iconurl), todocount and
+     *     closedcount.
      */
-    public static function card(\stdClass $course, int $userid, int $todolimit): array {
+    public static function card(\stdClass $course, int $userid, int $todolimit, ?int $now = null): array {
+        $now = $now ?? time();
         $context = \context_course::instance($course->id);
         $card = [
             'id' => (int) $course->id,
@@ -93,6 +99,7 @@ class courses {
             'progress' => null,
             'todo' => [],
             'todocount' => 0,
+            'closedcount' => 0,
         ];
 
         $completion = new \completion_info($course);
@@ -114,6 +121,10 @@ class courses {
             if ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS) {
                 continue;
             }
+            if (self::is_closed($cm, $userid, $now)) {
+                $card['closedcount']++;
+                continue;
+            }
             $card['todocount']++;
             if (count($card['todo']) < $todolimit) {
                 $card['todo'][] = [
@@ -129,6 +140,34 @@ class courses {
             }
         }
         return $card;
+    }
+
+    /**
+     * Whether the user can no longer do an activity: a quiz past its close date, or an assignment
+     * past its cut-off date, with the user's overrides and extension applied.
+     *
+     * @param \cm_info $cm
+     * @param int $userid
+     * @param int $now
+     * @return bool
+     */
+    public static function is_closed(\cm_info $cm, int $userid, int $now): bool {
+        global $CFG;
+        if ($cm->modname === 'quiz') {
+            $quiz = \mod_quiz\quiz_settings::create((int) $cm->instance, $userid)->get_quiz();
+            return !empty($quiz->timeclose) && $quiz->timeclose <= $now;
+        }
+        if ($cm->modname === 'assign') {
+            require_once($CFG->dirroot . '/mod/assign/locallib.php');
+            $assign = new \assign($cm->context, $cm, $cm->get_course());
+            $cutoff = (int) $assign->get_instance($userid)->cutoffdate;
+            if (!$cutoff || $cutoff > $now) {
+                return false;
+            }
+            $flags = $assign->get_user_flags($userid, false);
+            return !$flags || (int) $flags->extensionduedate <= $now;
+        }
+        return false;
     }
 
     /**

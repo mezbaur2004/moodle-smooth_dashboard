@@ -51,11 +51,20 @@ class deadlines {
      * @param int $overduedays How far back to look for overdue items.
      * @param int $limit How many items at most.
      * @param int|null $now The current time (for tests).
+     * @param \stdClass[]|null $courses The user's courses, keyed by id: quiz attempts waiting for
+     *     manual grading in those the user grades are added (quizzes have no calendar event for it).
      * @return array[] Each with id, cmid, instance, modname, name, courseid, course, type (due,
-     *     open, close, gradingdue or other), time, extended (an assignment extension moved it), url,
-     *     actionname, actionurl, actionable and itemcount.
+     *     open, close, gradingdue, tograde or other), time, extended (an assignment extension moved it),
+     *     url, actionname, actionurl, actionable and itemcount.
      */
-    public static function upcoming(array $modules, int $days, int $overduedays, int $limit, ?int $now = null): array {
+    public static function upcoming(
+        array $modules,
+        int $days,
+        int $overduedays,
+        int $limit,
+        ?int $now = null,
+        ?array $courses = null
+    ): array {
         if (!$modules || $limit < 1) {
             return [];
         }
@@ -71,7 +80,7 @@ class deadlines {
             foreach ($events as $event) {
                 $after = $event->get_id();
                 $row = self::export($event, $modules);
-                if ($row) {
+                if ($row && !self::missed($row, $now)) {
                     $rows[] = $row;
                     if (count($rows) >= $limit) {
                         break;
@@ -84,11 +93,89 @@ class deadlines {
         }
         if (isset($modules['assign'])) {
             $rows = self::apply_extensions($rows, $modules, $from, $to);
+            $rows = array_values(array_filter($rows, function (array $row) use ($now) {
+                return !self::missed($row, $now);
+            }));
+        }
+        if (isset($modules['quiz']) && $courses) {
+            $rows = array_merge($rows, self::quiz_grading($courses));
         }
         usort($rows, function (array $a, array $b) {
             return ($a['time'] <=> $b['time']) ?: ($a['id'] <=> $b['id']);
         });
         return array_slice($rows, 0, $limit);
+    }
+
+    /**
+     * Whether an item is past and can no longer be done: an assignment past its cut-off date, for
+     * example. The calendar still lists it, marked as not actionable; it is no longer something to
+     * do, and the block would otherwise call it "Not open yet".
+     *
+     * @param array $row From export().
+     * @param int $now
+     * @return bool
+     */
+    protected static function missed(array $row, int $now): bool {
+        return $row['time'] < $now && $row['type'] !== 'open' && !$row['actionable'];
+    }
+
+    /**
+     * Quiz attempts waiting for manual grading (essay questions, for example), one row per quiz,
+     * in the courses where the current user grades quizzes. A finished attempt with no total mark
+     * yet is one with questions still to grade.
+     *
+     * @param \stdClass[] $courses Keyed by id.
+     * @return array[] Rows like export(), of type tograde, dated by the oldest such attempt.
+     */
+    public static function quiz_grading(array $courses): array {
+        global $DB;
+        $courseids = [];
+        foreach ($courses as $course) {
+            if (has_capability('mod/quiz:grade', \context_course::instance($course->id))) {
+                $courseids[] = (int) $course->id;
+            }
+        }
+        if (!$courseids) {
+            return [];
+        }
+        [$insql, $params] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'c');
+        $params['finished'] = 'finished';
+        $records = $DB->get_records_sql(
+            "SELECT q.id, q.course, COUNT(qa.id) AS attempts, MIN(qa.timefinish) AS oldest
+               FROM {quiz} q
+               JOIN {quiz_attempts} qa ON qa.quiz = q.id
+              WHERE q.course $insql AND qa.state = :finished AND qa.sumgrades IS NULL AND qa.preview = 0
+           GROUP BY q.id, q.course",
+            $params
+        );
+        $rows = [];
+        foreach ($records as $record) {
+            $cm = get_fast_modinfo($record->course)->get_instances_of('quiz')[$record->id] ?? null;
+            if (!$cm || !$cm->uservisible || $cm->deletioninprogress || !has_capability('mod/quiz:grade', $cm->context)) {
+                continue;
+            }
+            $course = $courses[$record->course];
+            $rows[] = [
+                // Not a calendar event: a negative id keeps rows apart when sorting.
+                'id' => -(int) $cm->id,
+                'cmid' => (int) $cm->id,
+                'instance' => (int) $cm->instance,
+                'modname' => 'quiz',
+                'modtype' => get_string('modulename', 'quiz'),
+                'name' => $cm->get_formatted_name(),
+                'courseid' => (int) $course->id,
+                'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),
+                'type' => 'tograde',
+                'time' => (int) $record->oldest,
+                'extended' => false,
+                'url' => $cm->url->out(false),
+                'actionname' => get_string('gradeverb'),
+                'actionurl' => (new \moodle_url('/mod/quiz/report.php', ['id' => $cm->id, 'mode' => 'grading']))->out(false),
+                'actionable' => true,
+                'itemcount' => (int) $record->attempts,
+            ];
+        }
+        return $rows;
     }
 
     /**

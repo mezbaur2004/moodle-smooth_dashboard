@@ -54,7 +54,16 @@ class content {
             'rankings' => null,
             'attendance' => [],
             'coursestotal' => 0,
+            'rooms' => [],
         ];
+
+        // Parents and staff with no courses of their own (the operations account, for example)
+        // would only see "No classes scheduled" and "No courses in progress", which a parent reads
+        // as "my child has no classes". The block shows nothing for them: the Learning Hub shows a
+        // parent their children.
+        if (!$enrolled) {
+            return ['greeting' => false, 'shownextclass' => false, 'showclasses' => false] + $data;
+        }
 
         if ($data['shownextclass'] || $data['showclasses']) {
             // Classes of every course the user can access, not only those in progress: a course
@@ -66,6 +75,10 @@ class content {
                 $now
             );
         }
+        if ($data['shownextclass']) {
+            // Shown on the Next class card when there is no class with a time.
+            $data['rooms'] = schedule::rooms($enrolled, config::number('classescount'));
+        }
 
         if (config::show('deadlines')) {
             $data['deadlines'] = deadlines::upcoming(
@@ -73,7 +86,8 @@ class content {
                 config::number('deadlinesdays'),
                 config::number('overduedays'),
                 config::number('deadlinescount'),
-                $now
+                $now,
+                $enrolled
             );
         }
 
@@ -81,7 +95,7 @@ class content {
         if (config::show('courses')) {
             $data['courses'] = [];
             foreach ($shown as $course) {
-                $data['courses'][] = courses::card($course, $userid, config::number('todocount'));
+                $data['courses'][] = courses::card($course, $userid, config::number('todocount'), $now);
             }
             $data['coursestotal'] = count($inprogress);
         }

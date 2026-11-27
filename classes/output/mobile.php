@@ -68,6 +68,10 @@ class mobile {
     public static function otherdata(array $context): array {
         $plain = [dashboard::class, 'plain'];
         $classes = json_decode($context['classesjson'], true) ?: [];
+        $rooms = [];
+        foreach ($context['rooms'] as $room) {
+            $rooms[] = ['name' => $plain($room['name']), 'course' => $plain($room['course']), 'url' => $room['url']];
+        }
         $deadlines = [];
         foreach ($context['deadlines'] as $item) {
             $deadlines[] = [
@@ -79,6 +83,7 @@ class mobile {
                 'statustext' => $item['statustext'],
                 'color' => [
                     'overdue' => 'danger', 'today' => 'warning', 'tomorrow' => 'primary', 'open' => 'success',
+                    'tograde' => 'warning',
                 ][$item['status']] ?? 'medium',
                 'when' => $item['when'],
             ];
@@ -123,7 +128,7 @@ class mobile {
             [
             'nextclass', 'livenow', 'startingsoon', 'endsin', 'startsin', 'joinclass', 'joinnow', 'comingup', 'duesoon',
             'mycourses', 'leaderboards', 'noclasses', 'noclasses_help', 'nomoreclasses', 'allcaughtup', 'nodeadlines',
-            'upnext', 'nocourses',
+            'upnext', 'nocourses', 'classrooms', 'classrooms_help',
             ] as $identifier
         ) {
             $strings[$identifier] = get_string($identifier, 'block_smooth_dashboard');
@@ -139,6 +144,7 @@ class mobile {
             'shownextclass' => self::flag($context['shownextclass']),
             'showclasses' => self::flag($context['showclasses']),
             'classes' => json_encode($classes),
+            'rooms' => json_encode($rooms),
             'showdeadlines' => self::flag($context['showdeadlines']),
             'deadlines' => json_encode($deadlines),
             'showcourses' => self::flag($context['showcourses']),
@@ -204,6 +210,26 @@ class mobile {
             </ion-card-content>
         </ion-card>
         <ng-template #noClass>
+            <ion-card *ngIf="CONTENT_OTHERDATA.rooms.length; else noRooms">
+                <ion-card-header>
+                    <ion-card-subtitle>{{ CONTENT_OTHERDATA.strings.nextclass }}</ion-card-subtitle>
+                    <ion-card-title>{{ CONTENT_OTHERDATA.strings.classrooms }}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <p>{{ CONTENT_OTHERDATA.strings.classrooms_help }}</p>
+                    <ion-list>
+                        <ion-item *ngFor="let room of CONTENT_OTHERDATA.rooms" button core-link [href]="room.url" [capture]="true"
+                                detail="true">
+                            <ion-label>
+                                <h3>{{ room.name }}</h3>
+                                <p>{{ room.course }}</p>
+                            </ion-label>
+                        </ion-item>
+                    </ion-list>
+                </ion-card-content>
+            </ion-card>
+        </ng-template>
+        <ng-template #noRooms>
             <ion-card>
                 <ion-card-header>
                     <ion-card-subtitle>{{ CONTENT_OTHERDATA.strings.nextclass }}</ion-card-subtitle>
