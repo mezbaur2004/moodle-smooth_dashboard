@@ -119,4 +119,72 @@ final class deadlines_test extends \advanced_testcase {
         $this->assertSame($now - DAYSECS, $items[0]['time']);
         $this->assertFalse($items[0]['extended']);
     }
+
+    /**
+     * An overdue assignment past its cut-off date can no longer be submitted, so it drops out
+     * (the calendar marks it not actionable, which would read "Not open yet"); one before its
+     * cut-off date stays.
+     */
+    public function test_missed_assignment_drops_out(): void {
+        $this->resetAfterTest();
+        $now = time();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $user = $generator->create_and_enrol($course, 'student');
+        $common = ['course' => $course->id, 'assignsubmission_onlinetext_enabled' => 1, 'allowsubmissionsfromdate' => 0,
+            'duedate' => $now - 3 * DAYSECS];
+        $generator->create_module('assign', $common + ['name' => 'Closed', 'cutoffdate' => $now - DAYSECS]);
+        $generator->create_module('assign', $common + ['name' => 'Still open', 'cutoffdate' => $now + DAYSECS]);
+        $this->setUser($user);
+
+        $items = deadlines::upcoming(['assign'], 14, 7, 10, $now);
+        $this->assertSame(['Still open'], array_column($items, 'name'));
+        $this->assertTrue($items[0]['actionable']);
+    }
+
+    /**
+     * Teachers see quizzes with attempts waiting for manual grading (Due soon has no calendar event
+     * for it); students do not, and the rows only come with quizzes chosen.
+     */
+    public function test_quiz_grading(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['fullname' => 'English']);
+        $student = $generator->create_and_enrol($course, 'student');
+        $teacher = $generator->create_and_enrol($course, 'editingteacher');
+        /** @var \mod_quiz_generator $quizgenerator */
+        $quizgenerator = $generator->get_plugin_generator('mod_quiz');
+        $quiz = $quizgenerator->create_instance(['course' => $course->id, 'name' => 'Essay quiz', 'questionsperpage' => 0,
+            'grade' => 10, 'sumgrades' => 1]);
+        $questiongenerator = $generator->get_plugin_generator('core_question');
+        $category = $questiongenerator->create_question_category(['contextid' => \context_module::instance($quiz->cmid)->id]);
+        $essay = $questiongenerator->create_question('essay', null, ['category' => $category->id]);
+        quiz_add_quiz_question($essay->id, $quiz);
+
+        // The student writes the essay and submits: the attempt waits for the teacher.
+        $this->setUser($student);
+        $attempt = $quizgenerator->create_attempt($quiz->id, $student->id);
+        $finished = time() - HOURSECS;
+        $quizgenerator->submit_responses($attempt->id, [1 => 'My essay'], false, true, $finished);
+        $courses = [$course->id => $course];
+        $this->assertSame([], deadlines::quiz_grading($courses));
+
+        $this->setUser($teacher);
+        $rows = deadlines::quiz_grading($courses);
+        $this->assertCount(1, $rows);
+        $this->assertSame('Essay quiz', $rows[0]['name']);
+        $this->assertSame('English', $rows[0]['course']);
+        $this->assertSame('tograde', $rows[0]['type']);
+        $this->assertSame(1, $rows[0]['itemcount']);
+        $this->assertSame($finished, $rows[0]['time']);
+        $this->assertTrue($rows[0]['actionable']);
+        $this->assertStringContainsString('/mod/quiz/report.php?id=' . $quiz->cmid . '&mode=grading', $rows[0]['actionurl']);
+
+        $this->assertSame(
+            ['Essay quiz'],
+            array_column(deadlines::upcoming(['assign', 'quiz'], 14, 7, 10, null, $courses), 'name')
+        );
+        $this->assertSame([], deadlines::upcoming(['assign'], 14, 7, 10, null, $courses));
+        $this->assertSame([], deadlines::upcoming(['assign', 'quiz'], 14, 7, 10));
+    }
 }

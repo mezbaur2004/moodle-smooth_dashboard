@@ -263,6 +263,40 @@
     color: var(--sd-muted);
 }
 
+/* Recurring classes with no fixed time, on the empty Next class card. */
+.block_smooth_dashboard .sd-rooms {
+    margin: .8rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.block_smooth_dashboard .sd-room {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    padding: .6rem 0;
+    border-top: 1px solid var(--sd-border);
+}
+
+.block_smooth_dashboard .sd-room-text {
+    min-width: 0;
+}
+
+.block_smooth_dashboard .sd .sd-room-name {
+    display: block;
+    font-weight: 700;
+    color: var(--sd-text);
+    overflow-wrap: anywhere;
+}
+
+.block_smooth_dashboard .sd-room-course {
+    display: block;
+    font-size: .85rem;
+    color: var(--sd-muted);
+}
+
 .block_smooth_dashboard .sd-badge {
     display: inline-flex;
     align-items: center;
@@ -610,7 +644,8 @@
     background: var(--sd-red-bg);
 }
 
-.block_smooth_dashboard .sd-status-today {
+.block_smooth_dashboard .sd-status-today,
+.block_smooth_dashboard .sd-status-tograde {
     color: var(--sd-orange);
     background: var(--sd-orange-bg);
 }

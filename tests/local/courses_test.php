@@ -96,4 +96,38 @@ final class courses_test extends \advanced_testcase {
         $this->assertSame([], $card['todo']);
         $this->assertSame(0, $card['todocount']);
     }
+
+    /**
+     * A closed quiz and an assignment past its cut-off date are not "to do" any more: they are
+     * counted as closed. An extension or a later close date for the user keeps them to do.
+     */
+    public function test_card_closed_activities(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+        $this->resetAfterTest();
+        $now = time();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['enablecompletion' => 1]);
+        $user = $generator->create_and_enrol($course, 'student');
+        $tracked = ['course' => $course->id, 'completion' => COMPLETION_TRACKING_MANUAL];
+        /** @var \mod_quiz_generator $quizgenerator */
+        $quizgenerator = $generator->get_plugin_generator('mod_quiz');
+        $quizgenerator->create_instance($tracked + ['name' => 'Closed quiz', 'timeclose' => $now - DAYSECS]);
+        $quizgenerator->create_instance($tracked + ['name' => 'Open quiz', 'timeclose' => $now + DAYSECS]);
+        $overridden = $quizgenerator->create_instance($tracked + ['name' => 'Quiz open for me', 'timeclose' => $now - DAYSECS]);
+        $quizgenerator->create_override(['quiz' => $overridden->id, 'userid' => $user->id, 'timeclose' => $now + DAYSECS]);
+        $assignment = ['duedate' => $now - 2 * DAYSECS, 'cutoffdate' => $now - DAYSECS, 'allowsubmissionsfromdate' => 0,
+            'assignsubmission_onlinetext_enabled' => 1];
+        $generator->create_module('assign', $tracked + $assignment + ['name' => 'Past cut-off']);
+        $extended = $generator->create_module('assign', $tracked + $assignment + ['name' => 'Extended']);
+        $this->setAdminUser();
+        $assign = new \assign(\context_module::instance($extended->cmid), false, false);
+        $assign->save_user_extension($user->id, $now + DAYSECS);
+        $this->setUser($user);
+
+        $card = courses::card($course, (int) $user->id, 5, $now);
+        $this->assertSame(['Open quiz', 'Quiz open for me', 'Extended'], array_column($card['todo'], 'name'));
+        $this->assertSame(3, $card['todocount']);
+        $this->assertSame(2, $card['closedcount']);
+    }
 }

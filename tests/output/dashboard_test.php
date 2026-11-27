@@ -184,4 +184,79 @@ final class dashboard_test extends \advanced_testcase {
         set_config('accent2', 'red; background: url(x)', 'block_smooth_dashboard');
         $this->assertSame('--sd-accent-site: #0f6cbf;', \block_smooth_dashboard\local\config::accent_style());
     }
+
+    /**
+     * Quiz attempts to grade say "To grade" and are not counted as due; a card with closed
+     * activities left is not "All done".
+     */
+    public function test_tograde_and_closed(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $now = usergetmidnight(time()) + 10 * HOURSECS;
+        $dashboard = $this->dashboard($now, [
+            'deadlines' => [['id' => -5, 'cmid' => 5, 'modname' => 'quiz', 'modtype' => 'Quiz', 'name' => 'Essay quiz',
+                'courseid' => 2, 'course' => 'C', 'type' => 'tograde', 'time' => $now - DAYSECS, 'url' => 'u',
+                'actionname' => 'Grade', 'actionurl' => 'a', 'actionable' => true, 'itemcount' => 3]],
+            'courses' => [
+                ['id' => 2, 'name' => 'C', 'url' => 'u', 'image' => 'i', 'progress' => 50, 'todo' => [], 'todocount' => 0,
+                    'closedcount' => 1],
+                ['id' => 3, 'name' => 'D', 'url' => 'u', 'image' => 'i', 'progress' => 100, 'todo' => [], 'todocount' => 0,
+                    'closedcount' => 0],
+            ],
+        ]);
+        $context = $dashboard->export_for_template($PAGE->get_renderer('block_smooth_dashboard'));
+
+        $item = $context['deadlines'][0];
+        $this->assertSame('tograde', $item['status']);
+        $this->assertSame('To grade', $item['statustext']);
+        $this->assertFalse($item['overdue']);
+        $this->assertStringStartsWith('Waiting since yesterday', $item['when']);
+        $this->assertSame('Grade (3)', $item['actiontext']);
+        $this->assertSame(['Nothing due today'], array_column($context['greeting']['chips'], 'text'));
+        $this->assertSame([false, true], array_column($context['courses'], 'done'));
+    }
+
+    /**
+     * Without a class that has a time, the Next class card lists the recurring classes with no
+     * fixed time, on the website and in the app.
+     */
+    public function test_rooms_on_card(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+        if (!\core_component::get_component_directory('mod_zoom')) {
+            $this->markTestSkipped('mod_zoom is not installed.');
+        }
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['fullname' => 'Spoken English']);
+        $user = $generator->create_and_enrol($course, 'student');
+        $generator->create_module('zoom', ['course' => $course->id, 'name' => 'Batch 1 class', 'recurring' => 1,
+            'recurrence_type' => 0, 'start_time' => time(), 'duration' => HOURSECS]);
+        $this->setUser($user);
+        $PAGE->set_url('/my/');
+
+        $data = content::build();
+        $this->assertSame([], $data['classes']);
+        $this->assertSame(['Batch 1 class'], array_column($data['rooms'], 'name'));
+        $html = $PAGE->get_renderer('block_smooth_dashboard')->render(new dashboard($data));
+        $this->assertStringContainsString('Your classes', $html);
+        $this->assertStringContainsString('Batch 1 class', $html);
+        $this->assertStringNotContainsString('No classes scheduled', $html);
+
+        $app = mobile::mobile_block_view([]);
+        $this->assertSame('Batch 1 class', json_decode($app['otherdata']['rooms'], true)[0]['name']);
+        $this->assertStringContainsString('CONTENT_OTHERDATA.rooms', $app['templates'][0]['html']);
+    }
+
+    /**
+     * Someone with no courses (a parent, office staff) gets no block: an empty student dashboard
+     * would say their child has no classes.
+     */
+    public function test_no_courses_no_block(): void {
+        $this->resetAfterTest();
+        $this->setUser($this->getDataGenerator()->create_user());
+        $data = content::build();
+        $this->assertTrue(content::is_empty($data));
+        $this->assertSame(['show' => ''], mobile::mobile_block_view([])['otherdata']);
+    }
 }

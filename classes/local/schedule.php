@@ -29,8 +29,9 @@ namespace block_smooth_dashboard\local;
  *
  * mod_zoom writes one calendar event per scheduled class: one for a single meeting, one per
  * occurrence of a recurring meeting with a fixed time. Recurring meetings without a fixed time
- * have hidden events and no schedule, so they never appear here. Only classes of Zoom activities
- * the user can open are listed, so access restrictions and hidden activities are respected.
+ * have hidden events and no schedule, so they are not upcoming classes: rooms() lists them, as
+ * classes to join at their usual time. Only classes of Zoom activities the user can open are
+ * listed, so access restrictions and hidden activities are respected.
  */
 class schedule {
     /** @var int Length assumed for a class whose event has no duration. */
@@ -100,6 +101,57 @@ class schedule {
             ];
             if (count($rows) >= $limit) {
                 break;
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Recurring Zoom meetings without a fixed time (mod_zoom's "No fixed time" recurrence), in
+     * course order: they have no schedule in Moodle, but students join them at their usual class
+     * time.
+     *
+     * @param \stdClass[] $courses The user's courses, keyed by id, in the order to list them.
+     * @param int $limit How many at most.
+     * @return array[] Each with cmid, name, courseid, course, url and joinurl.
+     */
+    public static function rooms(array $courses, int $limit): array {
+        global $DB;
+        if (!$courses || $limit < 1 || !\core_component::get_component_directory('mod_zoom')) {
+            return [];
+        }
+        [$insql, $params] = $DB->get_in_or_equal(array_keys($courses), SQL_PARAMS_NAMED, 'c');
+        // Recurrence type 0 is ZOOM_RECURRINGTYPE_NOTIME.
+        $ids = $DB->get_records_select_menu(
+            'zoom',
+            "course $insql AND recurring = 1 AND recurrence_type = 0",
+            $params,
+            '',
+            'id, course'
+        );
+        if (!$ids) {
+            return [];
+        }
+        $rows = [];
+        foreach ($courses as $course) {
+            if (!in_array($course->id, $ids)) {
+                continue;
+            }
+            foreach (get_fast_modinfo($course->id)->get_instances_of('zoom') as $instance => $cm) {
+                if (!isset($ids[$instance]) || !self::get_cm((int) $course->id, (int) $instance)) {
+                    continue;
+                }
+                $rows[] = [
+                    'cmid' => (int) $cm->id,
+                    'name' => $cm->get_formatted_name(),
+                    'courseid' => (int) $course->id,
+                    'course' => format_string($course->fullname, true, ['context' => \context_course::instance($course->id)]),
+                    'url' => (new \moodle_url('/mod/zoom/view.php', ['id' => $cm->id]))->out(false),
+                    'joinurl' => (new \moodle_url('/mod/zoom/loadmeeting.php', ['id' => $cm->id]))->out(false),
+                ];
+                if (count($rows) >= $limit) {
+                    return $rows;
+                }
             }
         }
         return $rows;

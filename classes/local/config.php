@@ -34,7 +34,7 @@ class config {
         'classescount' => [5, 1, 20],
         'classesdays' => [14, 1, 90],
         'deadlinesdays' => [14, 1, 90],
-        'overduedays' => [7, 0, 60],
+        'overduedays' => [30, 0, 60],
         'deadlinescount' => [6, 1, 30],
         'coursescount' => [6, 1, 30],
         'todocount' => [3, 0, 10],
